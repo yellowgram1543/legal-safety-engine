@@ -12,9 +12,15 @@ flowchart TD
     AST --> Index[Offline Index Serialization to Disk<br/>- FAISS InnerProduct Index<br/>- Normalized BGE-small Embeddings<br/>- JSON Metadata Manifest]
     
     Index -- "Cold-Start: < 1 ms" --> Engine[FastAPI Asynchronous Engine<br/>- In-Memory Memory Mapped Index<br/>- Asymmetric Dense Search top-k]
+    
     Query[User Query] --> Engine
     
-    Engine -- Retrieved Context --> NLI[Cross-Encoder NLI Verification Gate<br/>DeBERTa-v3-small Entailment Auditor]
+    Engine -- Retrieved Context --> RejectionGate{Confidence Score < 0.60?}
+    RejectionGate -- Yes --> Reject[404 Rejection: Irrelevant Match]
+    
+    RejectionGate -- No --> LLM[Local Generative LLM<br/>Qwen2.5-0.5B-Instruct<br/>w/ Affirmative System Prompts]
+    
+    LLM -- Synthetic Claims --> NLI[Cross-Encoder NLI Verification Gate<br/>DeBERTa-v3-large Entailment Auditor]
     
     NLI -- "P(Entailment) >= 0.70" --> Safe[VERIFIED_SAFE Output]
     NLI -- "P(Contradiction) > 0.40" --> Flagged[INTERCEPTED / FLAGGED]
@@ -24,12 +30,12 @@ flowchart TD
 
 ## 2. Core Technical Contributions
 
-* **Structure-Aware Boundary Chunking:** Replaces fixed-token slicing with hierarchical clause-boundary parsing. Preserves parent-child section relationships, section headers, and character span offsets $[c_{\text{start}}, c_{\text{end}}]$.
-* **Zero-Recompute Artifact Persistence:** Ingestion and indexing are completely decoupled from runtime serving. Dense vectors are pre-computed and stored to disk via FAISS binary serialization (`contract_index.faiss`), enabling sub-millisecond cold boots.
-* **Deterministic Verification Gate:** Implements a post-generation cross-encoder Natural Language Inference (`nli-deberta-v3-small`) auditing layer. Every claim is verified against the source premise span:
+* **Offline Ingestion & Chunking (`core/parser.py`):** Accepts raw PDFs or TXT documents. Replaces fixed-token slicing with hierarchical clause-boundary parsing. Preserves parent-child section relationships and character offsets. Dynamically reconstructs the FAISS index on the fly.
+* **Local Generative Synthesis (`core/generator.py`):** Completely independent from paid APIs. Uses `Qwen2.5-0.5B-Instruct` (~490M params) running entirely on local CPU. Strict system prompts force the LLM to answer affirmatively to prevent NLI false-positives on negation.
+* **Deterministic Verification Gate (`core/auditor.py`):** Implements a post-generation cross-encoder Natural Language Inference (`nli-deberta-v3-large`) auditing layer. Features an explicit guardrail bypass mechanism for out-of-scope LLM responses. Every generated claim is verified against the source premise span:
 
 $$
-\text{Decision}(P, H) = \begin{cases} \text{VERIFIED\_SAFE}, & \text{if } P(\text{Entailment}) \ge 0.70 \\ \text{CONTRADICTION\_FLAG}, & \text{if } P(\text{Contradiction}) > 0.40 \\ \text{UNGROUNDED\_NEUTRAL}, & \text{otherwise} \end{cases}
+\text{Decision}(P, H) = \begin{cases} \text{VERIFIED\_SAFE}, & \text{if } P(\text{Entailment}) \ge 0.70 \text{ or Exact Substring} \\ \text{CONTRADICTION\_FLAG}, & \text{if } P(\text{Contradiction}) > 0.40 \\ \text{UNGROUNDED\_NEUTRAL}, & \text{otherwise} \end{cases}
 $$
 
 ---
@@ -38,12 +44,12 @@ $$
 
 Evaluated on CUAD commercial agreements across CPU runtime environments:
 
-| Pipeline Stage | Model / Strategy | Latency (CPU) | Artifact Size / Footprint |
-| :--- | :--- | :--- | :--- |
-| **Parsing & Chunking** | Regex AST Clause Extractor | ~12 ms / doc | In-memory stream |
-| **Index Serialization** | `BAAI/bge-small-en-v1.5` (384d) | 0.87 ms (read) | 67.5 KB (`.faiss`) + 86.6 KB (`.json`) |
-| **Dense Retrieval** | Cosine / Inner Product Search | 11.02 ms | RAM overhead < 150 MB |
-| **NLI Safety Gate** | `nli-deberta-v3-small` | 29.4 ms / claim | Zero token drift |
+| Pipeline Stage | Model / Strategy | Footprint / Latency |
+| :--- | :--- | :--- |
+| **Index Serialization** | `BAAI/bge-small-en-v1.5` (384d) | 67.5 KB (`.faiss`) + 86.6 KB (`.json`) |
+| **Dense Retrieval** | Cosine / Inner Product Search | < 15 ms |
+| **Local Synthesis** | `Qwen2.5-0.5B-Instruct` | ~1 GB RAM footprint |
+| **NLI Safety Gate** | `nli-deberta-v3-large` | ~1.5 GB RAM footprint |
 
 ---
 
@@ -55,19 +61,17 @@ legal-safety-engine/
 │   ├── contract_index.faiss      # Serialized FAISS Index
 │   └── clauses_metadata.json     # Document spans & section metadata
 ├── core/
-│   ├── __init__.py
+│   ├── parser.py                 # PDF/TXT Ingestion & AST Extraction
 │   ├── retriever.py              # Zero-recompute FAISS search engine
-│   └── auditor.py                # Cross-Encoder NLI fact-checking gate
-├── notebooks/
-│   └── research_experiment_lab.ipynb # Colab exploratory benchmarks
+│   ├── generator.py              # Qwen2.5 Local CPU Inference
+│   └── auditor.py                # DeBERTa-v3-large Fact-Checking Gate
 ├── server/
-│   ├── __init__.py
-│   ├── main.py                   # Asynchronous FastAPI lifespan service
+│   ├── static/
+│   │   └── index.html            # Zero-dependency Tailwind Glassmorphism UI
+│   ├── main.py                   # Asynchronous FastAPI service & Rejection Gate
 │   └── schemas.py                # Strict Pydantic v2 schemas
 ├── tests/
-│   ├── __init__.py
 │   └── test_engine.py            # Automated pytest suite
-├── requirements.txt
 └── README.md
 ```
 
@@ -78,34 +82,24 @@ legal-safety-engine/
 ### Setup Environment
 
 ```bash
-git clone https://github.com/<your-username>/legal-safety-engine.git
+git clone https://github.com/yellowgram1543/legal-safety-engine.git
 cd legal-safety-engine
 pip install -r requirements.txt
+pip install pypdf python-multipart
 ```
 
-### Run Test Suite
-
-```bash
-pytest -v tests/test_engine.py
-```
-
-### Start API Service
+### Start API Service & UI Dashboard
 
 ```bash
 uvicorn server.main:app --host 0.0.0.0 --port 8000
 ```
 
-### Query Endpoint Example
+1. Open your browser to `http://localhost:8000`.
+2. Click **Upload Contract** in the top right to ingest a PDF or TXT.
+3. Type a query into the search bar and hit **Audit** to watch the local LLM generate claims and the NLI model fact-check them in real-time.
+
+### Run Automated Test Suite
 
 ```bash
-curl -X POST "http://localhost:8000/query" \
-     -H "Content-Type: application/json" \
-     -d '{
-       "query": "Under what terms can the agreement be terminated for cause?",
-       "top_k": 1,
-       "simulated_claims": [
-         "Either party may terminate the agreement upon 30 days written notice.",
-         "Distributor must forfeit $50,000 immediately upon breach."
-       ]
-     }'
+pytest -v tests/test_engine.py
 ```
