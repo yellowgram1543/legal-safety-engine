@@ -1,4 +1,5 @@
 import time
+import re
 from typing import Dict, Any
 import numpy as np
 import torch
@@ -19,17 +20,31 @@ class LegalHallucinationAuditor:
         self.entailment_threshold = entailment_threshold
         self.contradiction_threshold = contradiction_threshold
 
+    def _normalize_text(self, text: str) -> str:
+        """Normalize whitespace for consistent matching."""
+        return re.sub(r'\s+', ' ', text).strip()
+
     def audit_claim(self, premise: str, claim: str) -> Dict[str, Any]:
         """Audit a single generated claim against a source premise text."""
         t0 = time.perf_counter()
 
-        # CrossEncoder returns raw logits for [contradiction, entailment, neutral]
-        scores = self.model.predict([(premise, claim)], apply_softmax=True)[0]
-        latency_ms = (time.perf_counter() - t0) * 1000
+        clean_premise = self._normalize_text(premise)
+        clean_claim = self._normalize_text(claim)
 
-        prob_contradiction = float(scores[0])
-        prob_entailment = float(scores[1])
-        prob_neutral = float(scores[2])
+        # Deterministic Shortcut: If the claim is an exact literal substring of the premise,
+        # it is definitionally entailed. NLI models often degrade on long-context exact matches.
+        if clean_claim.lower() in clean_premise.lower() and len(clean_claim) > 10:
+            prob_contradiction = 0.0
+            prob_entailment = 1.0
+            prob_neutral = 0.0
+        else:
+            # CrossEncoder returns raw logits for [contradiction, entailment, neutral]
+            scores = self.model.predict([(clean_premise, clean_claim)], apply_softmax=True)[0]
+            prob_contradiction = float(scores[0])
+            prob_entailment = float(scores[1])
+            prob_neutral = float(scores[2])
+
+        latency_ms = (time.perf_counter() - t0) * 1000
 
         if prob_entailment >= self.entailment_threshold:
             status = "VERIFIED_SAFE"
