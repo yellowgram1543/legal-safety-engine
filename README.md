@@ -6,46 +6,18 @@
 
 ## 1. System Architecture
 
-```text
-                              +---------------------------------------+
-                              |         Raw Contract PDF / Text       |
-                              +---------------------------------------+
-                                                 |
-                                                 v
-                              +---------------------------------------+
-                              |   Structure-Aware AST Clause Parser   |
-                              |  (Preserves Headers & Char Offsets)   |
-                              +---------------------------------------+
-                                                 |
-                                                 v
-                              +---------------------------------------+
-                              | Offline Index Serialization (Disk)    |
-                              | - FAISS InnerProduct Index            |
-                              | - Normalized BGE-small Embeddings     |
-                              | - JSON Metadata Manifest              |
-                              +---------------------------------------+
-                                                 |
-                                                 | [Cold-Start: < 1 ms]
-                                                 v
-+-------------------+             +---------------------------------------+
-|    User Query     | ----------> |  FastAPI Asynchronous Engine          |
-+-------------------+             |  - In-Memory Memory Mapped Index      |
-                                  |  - Asymmetric Dense Search (top-k)    |
-                                  +---------------------------------------+
-                                                 |
-                                         Retrieved Context
-                                                 v
-                              +---------------------------------------+
-                              | Cross-Encoder NLI Verification Gate   |
-                              | (DeBERTa-v3-small Entailment Auditor) |
-                              +---------------------------------------+
-                                        /                 \             
-              [P(Entailment) >= 0.70]                         [P(Contradiction) > 0.40]
-                      /                                               \
-                     v                                                 v
-           +-----------------------+                         +-----------------------+
-           |  VERIFIED_SAFE Output |                         | INTERCEPTED / FLAGGED |
-           +-----------------------+                         +-----------------------+
+```mermaid
+flowchart TD
+    Raw[Raw Contract PDF / Text] --> AST[Structure-Aware AST Clause Parser<br/>Preserves Headers & Char Offsets]
+    AST --> Index[Offline Index Serialization to Disk<br/>- FAISS InnerProduct Index<br/>- Normalized BGE-small Embeddings<br/>- JSON Metadata Manifest]
+    
+    Index -- "Cold-Start: < 1 ms" --> Engine[FastAPI Asynchronous Engine<br/>- In-Memory Memory Mapped Index<br/>- Asymmetric Dense Search top-k]
+    Query[User Query] --> Engine
+    
+    Engine -- Retrieved Context --> NLI[Cross-Encoder NLI Verification Gate<br/>DeBERTa-v3-small Entailment Auditor]
+    
+    NLI -- "P(Entailment) >= 0.70" --> Safe[VERIFIED_SAFE Output]
+    NLI -- "P(Contradiction) > 0.40" --> Flagged[INTERCEPTED / FLAGGED]
 ```
 
 ---
@@ -56,7 +28,9 @@
 * **Zero-Recompute Artifact Persistence:** Ingestion and indexing are completely decoupled from runtime serving. Dense vectors are pre-computed and stored to disk via FAISS binary serialization (`contract_index.faiss`), enabling sub-millisecond cold boots.
 * **Deterministic Verification Gate:** Implements a post-generation cross-encoder Natural Language Inference (`nli-deberta-v3-small`) auditing layer. Every claim is verified against the source premise span:
 
-$$\text{Decision}(P, H) = \begin{cases} \text{VERIFIED\_SAFE}, & \text{if } P(\text{Entailment}) \ge 0.70 \\ \text{CONTRADICTION\_FLAG}, & \text{if } P(\text{Contradiction}) > 0.40 \\ \text{UNGROUNDED\_NEUTRAL}, & \text{otherwise} \end{cases}$$
+$$
+\text{Decision}(P, H) = \begin{cases} \text{VERIFIED\_SAFE}, & \text{if } P(\text{Entailment}) \ge 0.70 \\ \text{CONTRADICTION\_FLAG}, & \text{if } P(\text{Contradiction}) > 0.40 \\ \text{UNGROUNDED\_NEUTRAL}, & \text{otherwise} \end{cases}
+$$
 
 ---
 
