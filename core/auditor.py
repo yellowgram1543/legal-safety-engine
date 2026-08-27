@@ -1,7 +1,8 @@
 import time
 from typing import Dict, Any
+import numpy as np
 import torch
-from transformers import AutoTokenizer, AutoModelForSequenceClassification
+from sentence_transformers import CrossEncoder
 
 
 class LegalHallucinationAuditor:
@@ -14,10 +15,7 @@ class LegalHallucinationAuditor:
         contradiction_threshold: float = 0.40,
     ) -> None:
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-        self.model = AutoModelForSequenceClassification.from_pretrained(model_name).to(self.device)
-        self.model.eval()
-
+        self.model = CrossEncoder(model_name, device=self.device)
         self.entailment_threshold = entailment_threshold
         self.contradiction_threshold = contradiction_threshold
 
@@ -25,23 +23,13 @@ class LegalHallucinationAuditor:
         """Audit a single generated claim against a source premise text."""
         t0 = time.perf_counter()
 
-        inputs = self.tokenizer(
-            premise,
-            claim,
-            truncation=True,
-            max_length=512,
-            return_tensors="pt"
-        ).to(self.device)
-
-        with torch.no_grad():
-            logits = self.model(**inputs).logits
-            probs = torch.softmax(logits, dim=-1)[0].cpu().numpy()
-
+        # CrossEncoder returns raw logits for [contradiction, entailment, neutral]
+        scores = self.model.predict([(premise, claim)], apply_softmax=True)[0]
         latency_ms = (time.perf_counter() - t0) * 1000
 
-        prob_contradiction = float(probs[0])
-        prob_entailment = float(probs[1])
-        prob_neutral = float(probs[2])
+        prob_contradiction = float(scores[0])
+        prob_entailment = float(scores[1])
+        prob_neutral = float(scores[2])
 
         if prob_entailment >= self.entailment_threshold:
             status = "VERIFIED_SAFE"
