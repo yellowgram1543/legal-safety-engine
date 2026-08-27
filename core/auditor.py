@@ -11,7 +11,7 @@ class LegalHallucinationAuditor:
 
     def __init__(
         self,
-        model_name: str = "cross-encoder/nli-deberta-v3-small",
+        model_name: str = "cross-encoder/nli-deberta-v3-large",
         entailment_threshold: float = 0.70,
         contradiction_threshold: float = 0.40,
     ) -> None:
