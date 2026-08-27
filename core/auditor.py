@@ -37,6 +37,12 @@ class LegalHallucinationAuditor:
             prob_contradiction = 0.0
             prob_entailment = 1.0
             prob_neutral = 0.0
+        # Deterministic Shortcut: If the LLM correctly identified that the topic is unmentioned
+        # (via our system prompt guardrail), explicitly label it as Neutral instead of letting the NLI panic.
+        elif "does not contain information regarding this topic" in clean_claim.lower():
+            prob_contradiction = 0.0
+            prob_entailment = 0.0
+            prob_neutral = 1.0
         else:
             # CrossEncoder returns raw logits for [contradiction, entailment, neutral]
             scores = self.model.predict([(clean_premise, clean_claim)], apply_softmax=True)[0]

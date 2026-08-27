@@ -91,6 +91,14 @@ async def process_legal_query(payload: QueryRequest) -> QueryResponse:
         )
 
     best_hit = hits[0]
+    
+    # Retrieval Score Floor / Rejection Gate
+    if best_hit.get("score", 1.0) < 0.60:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Rejection Gate: Top clause score ({best_hit.get('score', 0):.2f}) is below confidence threshold (0.60). No relevant contract clause found for this query.",
+        )
+
     top_clause = ClauseCitation(**best_hit)
 
     if payload.simulated_claims and len(payload.simulated_claims) > 0:
