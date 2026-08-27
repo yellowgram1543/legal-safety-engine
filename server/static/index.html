@@ -42,7 +42,6 @@
             border: 1px solid rgba(199, 125, 255, 0.15);
             box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
         }
-        .glow-text { text-shadow: 0 0 10px rgba(199, 125, 255, 0.5); }
         body { background: radial-gradient(circle at 50% -20%, #2d1b54, #1a103d 70%); }
         .scrollbar-hide::-webkit-scrollbar { display: none; }
         .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
@@ -52,7 +51,7 @@
     <!-- TopNavBar -->
     <header class="flex justify-between items-center w-full px-6 h-16 border-b border-outline-variant glass-panel flex-shrink-0 z-50">
         <div class="flex items-center gap-4">
-            <h1 class="text-lg font-headline font-bold tracking-tight text-primary glow-text">LEGAL SAFETY ENGINE</h1>
+            <h1 class="text-lg font-headline font-bold tracking-tight text-primary">LEGAL SAFETY ENGINE</h1>
             <span class="border border-outline-variant rounded-full px-3 py-0.5 text-xs text-on-surface-variant bg-surface-container-low hidden sm:inline-block">Zero-Trust Clause & Hallucination Auditor</span>
         </div>
         <div class="flex items-center gap-4">
@@ -64,10 +63,10 @@
             <div class="flex items-center gap-3 border-l border-outline-variant pl-4">
                 <div class="relative flex h-3 w-3">
                     <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-                    <span class="relative inline-flex rounded-full h-3 w-3 bg-primary shadow-[0_0_8px_#c77dff]"></span>
+                    <span class="relative inline-flex rounded-full h-3 w-3 bg-primary"></span>
                 </div>
                 <div class="flex flex-col">
-                    <span class="text-primary text-[10px] leading-tight glow-text font-bold">Engine Active</span>
+                    <span class="text-primary text-[10px] leading-tight font-bold">Engine Active</span>
                     <span class="text-on-surface-variant font-mono text-[10px] leading-tight">Qwen2.5 + DeBERTa-v3</span>
                 </div>
             </div>
