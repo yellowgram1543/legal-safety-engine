@@ -217,13 +217,11 @@
                 const data = await res.json();
 
                 const cleanHeader = normalizeLegalText(data.top_clause.header);
-                let cleanBody = normalizeLegalText(data.top_clause.text);
-                if (cleanBody.startsWith(cleanHeader)) {
-                    cleanBody = cleanBody.substring(cleanHeader.length).trim();
-                }
+                const cleanBody = normalizeLegalText(data.top_clause.text);
 
-                document.getElementById("clause-header").innerText = cleanHeader;
-                document.getElementById("clause-body").innerText = cleanBody || cleanHeader;
+                // Display just the header if there's no body, otherwise display the full text which already contains the header
+                document.getElementById("clause-header").innerText = "Extracted Clause";
+                document.getElementById("clause-body").innerText = cleanBody;
                 document.getElementById("clause-offsets").innerText = `Offsets: ${data.top_clause.start_char}-${data.top_clause.end_char}`;
                 document.getElementById("clause-score").innerText = `Score: ${data.top_clause.score.toFixed(4)}`;
 
