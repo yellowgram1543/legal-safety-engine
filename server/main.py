@@ -1,4 +1,5 @@
 import os
+import re
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 from fastapi import FastAPI, HTTPException, status
@@ -58,10 +59,20 @@ async def process_legal_query(payload: QueryRequest) -> QueryResponse:
 
     claims_to_audit = payload.simulated_claims
     if not claims_to_audit:
-        claims_to_audit = [
-            f"The agreement outlines specific provisions regarding {payload.query}.",
-            "The distributor is liable for an unliquidated penalty of $50,000 upon contract termination.",
+        # Split the retrieved clause into real distinct sentences
+        raw_sentences = [
+            s.strip()
+            for s in re.split(r"(?<=[.!?])\s+", best_hit["text"])
+            if len(s.strip()) > 20
         ]
+        
+        # Pick up to 2 real sentences from the clause
+        claims_to_audit = raw_sentences[:2] if raw_sentences else [best_hit["text"]]
+        
+        # Add one dynamically altered test claim to demonstrate safety gating
+        claims_to_audit.append(
+            f"The agreement explicitly forbids all activities related to {payload.query}."
+        )
 
     audit_results = []
     verified_claims = []
