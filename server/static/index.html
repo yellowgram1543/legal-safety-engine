@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html class="dark" lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>Legal Safety Engine - Engine Dashboard</title>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&family=Quicksand:wght@500;600;700&display=swap" rel="stylesheet"/>
+    <script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#c77dff",
+                        "primary-container": "#7b2cbf",
+                        "secondary": "#e0aaff",
+                        "background": "#1a103d",
+                        "surface-container": "rgba(45, 27, 84, 0.3)",
+                        "surface-container-low": "rgba(45, 27, 84, 0.4)",
+                        "surface-container-high": "rgba(45, 27, 84, 0.6)",
+                        "surface-container-lowest": "rgba(26, 16, 61, 0.6)",
+                        "outline-variant": "rgba(123, 44, 191, 0.3)",
+                        "on-surface": "#f5e6ff",
+                        "on-surface-variant": "#d4bbee",
+                        "error": "#ffb4ab"
+                    },
+                    fontFamily: {
+                        "headline": ["Poppins", "sans-serif"],
+                        "body": ["Poppins", "sans-serif"],
+                        "mono": ["Quicksand", "monospace"]
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .glass-panel {
+            background: rgba(45, 27, 84, 0.3);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(199, 125, 255, 0.15);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+        }
+        .glow-text { text-shadow: 0 0 10px rgba(199, 125, 255, 0.5); }
+        body { background: radial-gradient(circle at 50% -20%, #2d1b54, #1a103d 70%); }
+        .scrollbar-hide::-webkit-scrollbar { display: none; }
+        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+</head>
+<body class="bg-background text-on-surface font-body h-screen flex flex-col overflow-hidden text-sm">
+    <!-- TopNavBar -->
+    <header class="flex justify-between items-center w-full px-6 h-16 border-b border-outline-variant glass-panel flex-shrink-0 z-50">
+        <div class="flex items-center gap-4">
+            <h1 class="text-lg font-headline font-bold tracking-tight text-primary glow-text">LEGAL SAFETY ENGINE</h1>
+            <span class="border border-outline-variant rounded-full px-3 py-0.5 text-xs text-on-surface-variant bg-surface-container-low hidden sm:inline-block">Zero-Trust Clause & Hallucination Auditor</span>
+        </div>
+        <div class="flex items-center gap-4">
+            <div class="flex items-center gap-3 border-l border-outline-variant pl-4">
+                <div class="relative flex h-3 w-3">
+                    <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-3 w-3 bg-primary shadow-[0_0_8px_#c77dff]"></span>
+                </div>
+                <div class="flex flex-col">
+                    <span class="text-primary text-[10px] leading-tight glow-text font-bold">FastAPI Engine Active</span>
+                    <span class="text-on-surface-variant font-mono text-[10px] leading-tight">BGE-small + DeBERTa-v3</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="flex flex-1 overflow-hidden relative">
+        <!-- Main Workspace -->
+        <main class="flex-1 flex flex-col p-6 gap-4 overflow-y-auto pb-28 z-10 w-full max-w-7xl mx-auto">
+            <div class="flex flex-col xl:flex-row gap-6 h-full">
+                
+                <!-- Left Column: Search & Source (45%) -->
+                <div class="w-full xl:w-[45%] flex flex-col gap-4">
+                    <!-- Query Input Card -->
+                    <div class="glass-panel rounded-2xl p-4 shadow-lg">
+                        <div class="flex gap-3 mb-3">
+                            <input id="query-input" class="w-full bg-surface-container-lowest bg-opacity-50 border border-outline-variant text-on-surface rounded-xl px-4 py-2.5 text-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none" placeholder="Ask a contract question (e.g., 'termination conditions')..." value="Under what terms can the agreement be terminated for cause?" type="text"/>
+                            <button onclick="submitAuditQuery()" id="submit-btn" class="bg-primary-container bg-opacity-30 hover:bg-opacity-50 text-primary border border-primary border-opacity-40 rounded-xl px-5 py-2.5 font-bold transition-all whitespace-nowrap">Audit</button>
+                        </div>
+                        <div class="flex items-center gap-3 text-xs text-on-surface-variant">
+                            <span>Top-K Clauses:</span>
+                            <button onclick="setTopK(1)" id="k-1" class="k-btn bg-primary bg-opacity-30 border border-primary px-2.5 py-0.5 rounded-full text-primary font-mono">[1]</button>
+                            <button onclick="setTopK(2)" id="k-2" class="k-btn bg-surface-container border border-outline-variant px-2.5 py-0.5 rounded-full text-on-surface-variant font-mono">[2]</button>
+                            <button onclick="setTopK(3)" id="k-3" class="k-btn bg-surface-container border border-outline-variant px-2.5 py-0.5 rounded-full text-on-surface-variant font-mono">[3]</button>
+                        </div>
+                    </div>
+
+                    <!-- Ground Truth Clause View -->
+                    <div class="glass-panel rounded-2xl flex-1 flex flex-col overflow-hidden shadow-lg min-h-[350px]">
+                        <div class="border-b border-outline-variant p-3 bg-surface-container-low flex justify-between items-center text-xs">
+                            <span class="font-bold text-on-surface flex items-center gap-1.5"><span class="material-symbols-outlined text-sm text-primary">fact_check</span> Source Ground Truth (AST)</span>
+                            <div class="flex gap-2 font-mono text-[11px]">
+                                <span id="clause-offsets" class="bg-surface-container-highest px-2 py-0.5 rounded border border-outline-variant">Offsets: --</span>
+                                <span id="clause-score" class="bg-primary bg-opacity-20 text-primary px-2 py-0.5 rounded border border-primary border-opacity-30">Score: --</span>
+                            </div>
+                        </div>
+                        <div class="p-4 overflow-y-auto flex-1 text-on-surface-variant leading-relaxed">
+                            <p id="clause-header" class="text-on-surface font-semibold text-base mb-2">No clause loaded</p>
+                            <p id="clause-body" class="text-xs leading-relaxed whitespace-pre-wrap">Execute a query above to retrieve and audit contractual clauses.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Column: Verification Metrics & Claims (55%) -->
+                <div class="w-full xl:w-[55%] flex flex-col gap-4">
+                    <!-- Metric Cards -->
+                    <div class="grid grid-cols-3 gap-3">
+                        <div class="glass-panel border-l-4 border-l-emerald-400 rounded-xl p-3 flex flex-col justify-between">
+                            <span class="text-xs text-on-surface-variant">Verified Safe</span>
+                            <span id="metric-safe" class="text-2xl font-bold text-emerald-400">0</span>
+                        </div>
+                        <div class="glass-panel border-l-4 border-l-rose-400 rounded-xl p-3 flex flex-col justify-between">
+                            <span class="text-xs text-on-surface-variant">Hallucinations</span>
+                            <span id="metric-flagged" class="text-2xl font-bold text-rose-400">0</span>
+                        </div>
+                        <div class="glass-panel rounded-xl p-3 flex flex-col justify-between">
+                            <span class="text-xs text-on-surface-variant">Avg Audit Latency</span>
+                            <div class="flex items-baseline gap-1">
+                                <span id="metric-latency" class="text-2xl font-bold text-on-surface">0.0</span>
+                                <span class="text-xs font-mono text-secondary">ms</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Claims Container -->
+                    <div class="flex flex-col gap-3 flex-1 overflow-y-auto pr-1">
+                        <h2 class="text-xs font-bold text-secondary uppercase tracking-wider flex items-center gap-1.5"><span class="material-symbols-outlined text-sm">memory</span> Deterministic Claim Verification</h2>
+                        <div id="claims-container" class="flex flex-col gap-3">
+                            <div class="text-xs text-on-surface-variant/60 italic p-4 text-center glass-panel rounded-xl">Run an audit query to verify claims against the retrieved ground truth.</div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+    </div>
+
+    <!-- Bottom Telemetry Drawer -->
+    <div class="fixed bottom-0 left-0 right-0 border-t border-outline-variant glass-panel z-30 transition-all rounded-t-2xl">
+        <div class="flex items-center justify-between px-4 py-2 bg-surface-container-low cursor-pointer" onclick="toggleTelemetry()">
+            <span class="text-xs font-bold text-secondary flex items-center gap-2"><span class="material-symbols-outlined text-xs">terminal</span> Raw API Payload / Telemetry</span>
+            <span class="material-symbols-outlined text-secondary text-sm" id="telemetry-icon">expand_less</span>
+        </div>
+        <div class="p-3 bg-background bg-opacity-70 hidden flex-col gap-2 h-44 overflow-y-auto" id="telemetry-content">
+            <pre id="raw-json" class="font-mono text-xs text-primary bg-surface-container-lowest p-3 rounded-lg border border-outline-variant overflow-x-auto whitespace-pre-wrap">{}</pre>
+        </div>
+    </div>
+
+    <script>
+        let selectedTopK = 1;
+        let isTelemetryOpen = false;
+
+        function setTopK(k) {
+            selectedTopK = k;
+            [1, 2, 3].forEach(i => {
+                const btn = document.getElementById(`k-${i}`);
+                if (i === k) {
+                    btn.className = "k-btn bg-primary bg-opacity-30 border border-primary px-2.5 py-0.5 rounded-full text-primary font-mono";
+                } else {
+                    btn.className = "k-btn bg-surface-container border border-outline-variant px-2.5 py-0.5 rounded-full text-on-surface-variant font-mono";
+                }
+            });
+        }
+
+        function toggleTelemetry() {
+            const content = document.getElementById('telemetry-content');
+            const icon = document.getElementById('telemetry-icon');
+            isTelemetryOpen = !isTelemetryOpen;
+            content.style.display = isTelemetryOpen ? 'flex' : 'none';
+            icon.innerText = isTelemetryOpen ? 'expand_more' : 'expand_less';
+        }
+
+        async function submitAuditQuery() {
+            const query = document.getElementById("query-input").value.trim();
+            if (!query) return;
+
+            const btn = document.getElementById("submit-btn");
+            btn.innerText = "Auditing...";
+            btn.disabled = true;
+
+            try {
+                const res = await fetch("/query", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ query: query, top_k: selectedTopK })
+                });
+
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+
+                // 1. Update Ground Truth View
+                document.getElementById("clause-header").innerText = data.top_clause.header;
+                document.getElementById("clause-body").innerText = data.top_clause.text;
+                document.getElementById("clause-offsets").innerText = `Offsets: ${data.top_clause.start_char}-${data.top_clause.end_char}`;
+                document.getElementById("clause-score").innerText = `Score: ${data.top_clause.score.toFixed(4)}`;
+
+                // 2. Update Metrics
+                document.getElementById("metric-safe").innerText = data.verified_safe_claims.length;
+                document.getElementById("metric-flagged").innerText = data.flagged_claims.length;
+                
+                const avgLatency = data.audit_results.length > 0 
+                    ? (data.audit_results.reduce((acc, r) => acc + r.latency_ms, 0) / data.audit_results.length).toFixed(1)
+                    : "0.0";
+                document.getElementById("metric-latency").innerText = avgLatency;
+
+                // 3. Render Claim Cards
+                const container = document.getElementById("claims-container");
+                container.innerHTML = "";
+
+                data.audit_results.forEach(audit => {
+                    const isSafe = audit.is_safe;
+                    const borderColor = isSafe ? "border-l-emerald-400" : "border-l-rose-400";
+                    const badgeBg = isSafe ? "bg-emerald-500/20 text-emerald-300 border-emerald-500/40" : "bg-rose-500/20 text-rose-300 border-rose-500/40";
+                    const badgeText = isSafe ? "[PASS] VERIFIED_SAFE" : `[FAIL] ${audit.status}`;
+                    
+                    const entPct = (audit.entailment_score * 100).toFixed(1);
+                    const conPct = (audit.contradiction_score * 100).toFixed(1);
+                    const neuPct = (audit.neutral_score * 100).toFixed(1);
+
+                    const card = document.createElement("div");
+                    card.className = `glass-panel border-l-4 ${borderColor} rounded-xl p-4 flex flex-col gap-2 shadow`;
+                    card.innerHTML = `
+                        <div class="flex justify-between items-start gap-2">
+                            <p class="text-xs text-on-surface font-medium">"${audit.claim}"</p>
+                            <span class="text-[10px] font-mono px-2 py-0.5 rounded-full border ${badgeBg} whitespace-nowrap">${badgeText}</span>
+                        </div>
+                        <div class="w-full bg-background/50 rounded-full h-1.5 flex overflow-hidden border border-outline-variant/40 mt-1">
+                            <div class="bg-emerald-400 h-1.5" style="width: ${entPct}%"></div>
+                            <div class="bg-amber-400 h-1.5" style="width: ${neuPct}%"></div>
+                            <div class="bg-rose-400 h-1.5" style="width: ${conPct}%"></div>
+                        </div>
+                        <div class="flex justify-between text-[10px] font-mono text-on-surface-variant">
+                            <span class="text-emerald-300">Entailment: ${entPct}%</span>
+                            <span class="text-amber-300">Neutral: ${neuPct}%</span>
+                            <span class="text-rose-300">Contradiction: ${conPct}%</span>
+                        </div>
+                    `;
+                    container.appendChild(card);
+                });
+
+                // 4. Update Telemetry JSON
+                document.getElementById("raw-json").innerText = JSON.stringify(data, null, 2);
+
+            } catch (err) {
+                alert("Audit query failed: " + err.message);
+            } finally {
+                btn.innerText = "Audit";
+                btn.disabled = false;
+            }
+        }
+    </script>
+</body>
+</html>
