@@ -1,12 +1,15 @@
 import os
+import shutil
+import tempfile
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
-from fastapi import FastAPI, HTTPException, status
+from fastapi import FastAPI, HTTPException, UploadFile, File, status
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from core.retriever import LegalClauseRetriever
 from core.auditor import LegalHallucinationAuditor
 from core.generator import LocalLegalGenerator
+from core.parser import ContractIngestionPipeline
 from server.schemas import QueryRequest, QueryResponse, ClauseCitation, ClaimAuditVerdict
 
 
@@ -16,6 +19,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     app.state.retriever = LegalClauseRetriever()
     app.state.auditor = LegalHallucinationAuditor()
     app.state.generator = LocalLegalGenerator()
+    app.state.ingestion = ContractIngestionPipeline()
     print("All models and indices loaded successfully.")
     yield
     print("Shutting down engine...")
@@ -42,13 +46,43 @@ async def health_check() -> dict:
     return {"status": "healthy", "service": "legal-safety-engine"}
 
 
+@app.post("/upload", status_code=status.HTTP_200_OK)
+async def upload_contract(file: UploadFile = File(...)) -> dict:
+    ingestion: ContractIngestionPipeline = app.state.ingestion
+    
+    suffix = os.path.splitext(file.filename)[1].lower()
+    if suffix not in [".pdf", ".txt"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Unsupported file format. Please upload a .pdf or .txt contract."
+        )
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        shutil.copyfileobj(file.file, tmp)
+        tmp_path = tmp.name
+
+    try:
+        doc_id = os.path.splitext(file.filename)[0]
+        result = ingestion.process_and_index(tmp_path, doc_id=doc_id)
+        # Hot-reload retriever with new serialized index
+        app.state.retriever = LegalClauseRetriever()
+        return {
+            "status": "success",
+            "filename": file.filename,
+            "clauses_indexed": result["clauses_indexed"],
+            "total_chars": result["total_chars"]
+        }
+    finally:
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+
+
 @app.post("/query", response_model=QueryResponse, status_code=status.HTTP_200_OK)
 async def process_legal_query(payload: QueryRequest) -> QueryResponse:
     retriever: LegalClauseRetriever = app.state.retriever
     auditor: LegalHallucinationAuditor = app.state.auditor
     generator: LocalLegalGenerator = app.state.generator
 
-    # 1. Retrieve Ground Truth Context
     hits = retriever.retrieve(payload.query, top_k=payload.top_k)
     if not hits:
         raise HTTPException(
@@ -59,7 +93,6 @@ async def process_legal_query(payload: QueryRequest) -> QueryResponse:
     best_hit = hits[0]
     top_clause = ClauseCitation(**best_hit)
 
-    # 2. Generate Real LLM Claims (or use custom payload claims if provided)
     if payload.simulated_claims and len(payload.simulated_claims) > 0:
         claims_to_audit = payload.simulated_claims
     else:
@@ -69,7 +102,6 @@ async def process_legal_query(payload: QueryRequest) -> QueryResponse:
         )
         claims_to_audit = gen_result["claims"]
 
-    # 3. Audit each LLM-generated claim against the raw clause
     audit_results = []
     verified_claims = []
     flagged_claims = []

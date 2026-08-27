@@ -17,26 +17,24 @@ class LocalLegalGenerator:
         )
 
     def generate_answer(self, query: str, context: str) -> Dict[str, Any]:
-        """Generate an answer from context and split into distinct claims."""
+        """Generate a strictly grounded answer from context and split into claims."""
+        system_instruction = (
+            "You are a strict, faithful legal contract analyst. "
+            "Answer the question concisely in 1 to 3 sentences using ONLY the provided excerpt. "
+            "If the excerpt does not mention the topic or entity in the question, state: "
+            "'The provided contract clause does not contain information regarding this topic.'"
+        )
+
         messages = [
-            {
-                "role": "system",
-                "content": (
-                    "You are a legal assistant. Answer the user question concisely using "
-                    "ONLY the provided contract excerpt. Write 2 or 3 complete sentences."
-                ),
-            },
-            {
-                "role": "user",
-                "content": f"Contract Excerpt:\n{context}\n\nQuestion: {query}\n\nAnswer:",
-            },
+            {"role": "system", "content": system_instruction},
+            {"role": "user", "content": f"Contract Excerpt:\n{context}\n\nQuestion: {query}\n\nAnswer:"},
         ]
 
         output = self.pipe(
             messages,
             max_new_tokens=150,
-            temperature=0.3,
-            do_sample=True,
+            temperature=0.1,
+            do_sample=False,
             return_full_text=False,
         )
 

@@ -56,30 +56,32 @@
             <span class="border border-outline-variant rounded-full px-3 py-0.5 text-xs text-on-surface-variant bg-surface-container-low hidden sm:inline-block">Zero-Trust Clause & Hallucination Auditor</span>
         </div>
         <div class="flex items-center gap-4">
+            <input type="file" id="contract-file" accept=".pdf,.txt" class="hidden" onchange="uploadContract(event)">
+            <button onclick="document.getElementById('contract-file').click()" id="upload-btn" class="bg-surface-container-high hover:bg-opacity-80 border border-primary border-opacity-40 text-secondary text-xs px-3.5 py-1.5 rounded-lg flex items-center gap-1.5 transition-all">
+                <span class="material-symbols-outlined text-sm">upload_file</span>
+                <span id="upload-btn-text">Upload Contract (PDF/TXT)</span>
+            </button>
             <div class="flex items-center gap-3 border-l border-outline-variant pl-4">
                 <div class="relative flex h-3 w-3">
                     <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
                     <span class="relative inline-flex rounded-full h-3 w-3 bg-primary shadow-[0_0_8px_#c77dff]"></span>
                 </div>
                 <div class="flex flex-col">
-                    <span class="text-primary text-[10px] leading-tight glow-text font-bold">FastAPI Engine Active</span>
-                    <span class="text-on-surface-variant font-mono text-[10px] leading-tight">BGE-small + DeBERTa-v3</span>
+                    <span class="text-primary text-[10px] leading-tight glow-text font-bold">Engine Active</span>
+                    <span class="text-on-surface-variant font-mono text-[10px] leading-tight">Qwen2.5 + DeBERTa-v3</span>
                 </div>
             </div>
         </div>
     </header>
 
     <div class="flex flex-1 overflow-hidden relative">
-        <!-- Main Workspace -->
         <main class="flex-1 flex flex-col p-6 gap-4 overflow-y-auto pb-28 z-10 w-full max-w-7xl mx-auto">
             <div class="flex flex-col xl:flex-row gap-6 h-full">
-                
                 <!-- Left Column: Search & Source (45%) -->
                 <div class="w-full xl:w-[45%] flex flex-col gap-4">
-                    <!-- Query Input Card -->
                     <div class="glass-panel rounded-2xl p-4 shadow-lg">
                         <div class="flex gap-3 mb-3">
-                            <input id="query-input" class="w-full bg-surface-container-lowest bg-opacity-50 border border-outline-variant text-on-surface rounded-xl px-4 py-2.5 text-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none" placeholder="Ask a contract question (e.g., 'termination conditions')..." value="Under what terms can the agreement be terminated for cause?" type="text"/>
+                            <input id="query-input" class="w-full bg-surface-container-lowest bg-opacity-50 border border-outline-variant text-on-surface rounded-xl px-4 py-2.5 text-sm focus:border-primary focus:ring-1 focus:ring-primary outline-none" placeholder="Ask a contract question..." value="Under what terms can the agreement be terminated for cause?" type="text"/>
                             <button onclick="submitAuditQuery()" id="submit-btn" class="bg-primary-container bg-opacity-30 hover:bg-opacity-50 text-primary border border-primary border-opacity-40 rounded-xl px-5 py-2.5 font-bold transition-all whitespace-nowrap">Audit</button>
                         </div>
                         <div class="flex items-center gap-3 text-xs text-on-surface-variant">
@@ -90,7 +92,6 @@
                         </div>
                     </div>
 
-                    <!-- Ground Truth Clause View -->
                     <div class="glass-panel rounded-2xl flex-1 flex flex-col overflow-hidden shadow-lg min-h-[350px]">
                         <div class="border-b border-outline-variant p-3 bg-surface-container-low flex justify-between items-center text-xs">
                             <span class="font-bold text-on-surface flex items-center gap-1.5"><span class="material-symbols-outlined text-sm text-primary">fact_check</span> Source Ground Truth (AST)</span>
@@ -101,14 +102,13 @@
                         </div>
                         <div class="p-4 overflow-y-auto flex-1 text-on-surface-variant leading-relaxed">
                             <p id="clause-header" class="text-on-surface font-semibold text-base mb-2">No clause loaded</p>
-                            <p id="clause-body" class="text-xs leading-relaxed whitespace-normal text-on-surface-variant">Execute a query above to retrieve and audit contractual clauses.</p>
+                            <p id="clause-body" class="text-xs leading-relaxed whitespace-normal">Execute a query above to retrieve and audit contractual clauses.</p>
                         </div>
                     </div>
                 </div>
 
                 <!-- Right Column: Verification Metrics & Claims (55%) -->
                 <div class="w-full xl:w-[55%] flex flex-col gap-4">
-                    <!-- Metric Cards -->
                     <div class="grid grid-cols-3 gap-3">
                         <div class="glass-panel border-l-4 border-l-emerald-400 rounded-xl p-3 flex flex-col justify-between">
                             <span class="text-xs text-on-surface-variant">Verified Safe</span>
@@ -127,7 +127,6 @@
                         </div>
                     </div>
 
-                    <!-- Claims Container -->
                     <div class="flex flex-col gap-3 flex-1 overflow-y-auto pr-1">
                         <h2 class="text-xs font-bold text-secondary uppercase tracking-wider flex items-center gap-1.5"><span class="material-symbols-outlined text-sm">memory</span> Deterministic Claim Verification</h2>
                         <div id="claims-container" class="flex flex-col gap-3">
@@ -135,7 +134,6 @@
                         </div>
                     </div>
                 </div>
-
             </div>
         </main>
     </div>
@@ -155,15 +153,17 @@
         let selectedTopK = 1;
         let isTelemetryOpen = false;
 
+        function normalizeLegalText(text) {
+            return text.replace(/\r\n/g, '\n').replace(/[ \t]+/g, ' ').replace(/\n\s*\n+/g, '\n\n').trim();
+        }
+
         function setTopK(k) {
             selectedTopK = k;
             [1, 2, 3].forEach(i => {
                 const btn = document.getElementById(`k-${i}`);
-                if (i === k) {
-                    btn.className = "k-btn bg-primary bg-opacity-30 border border-primary px-2.5 py-0.5 rounded-full text-primary font-mono";
-                } else {
-                    btn.className = "k-btn bg-surface-container border border-outline-variant px-2.5 py-0.5 rounded-full text-on-surface-variant font-mono";
-                }
+                btn.className = (i === k) 
+                    ? "k-btn bg-primary bg-opacity-30 border border-primary px-2.5 py-0.5 rounded-full text-primary font-mono"
+                    : "k-btn bg-surface-container border border-outline-variant px-2.5 py-0.5 rounded-full text-on-surface-variant font-mono";
             });
         }
 
@@ -174,14 +174,28 @@
             content.style.display = isTelemetryOpen ? 'flex' : 'none';
             icon.innerText = isTelemetryOpen ? 'expand_more' : 'expand_less';
         }
-        
-        // Clean up extra spaces/newlines while preserving clean paragraph breaks
-        function normalizeLegalText(text) {
-            return text
-                .replace(/\r\n/g, '\n')
-                .replace(/[ \t]+/g, ' ')
-                .replace(/\n\s*\n+/g, '\n\n')
-                .trim();
+
+        async function uploadContract(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const btnText = document.getElementById("upload-btn-text");
+            btnText.innerText = "Indexing Contract...";
+
+            const formData = new FormData();
+            formData.append("file", file);
+
+            try {
+                const res = await fetch("/upload", { method: "POST", body: formData });
+                if (!res.ok) throw new Error(await res.text());
+                const data = await res.json();
+                alert(`Successfully indexed "${data.filename}" (${data.clauses_indexed} clauses extracted). Ready for querying!`);
+            } catch (err) {
+                alert("Upload failed: " + err.message);
+            } finally {
+                btnText.innerText = "Upload Contract (PDF/TXT)";
+                event.target.value = "";
+            }
         }
 
         async function submitAuditQuery() {
@@ -202,11 +216,8 @@
                 if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 const data = await res.json();
 
-                // 1. Update Ground Truth View
                 const cleanHeader = normalizeLegalText(data.top_clause.header);
                 let cleanBody = normalizeLegalText(data.top_clause.text);
-
-                // If the body starts with the exact header text, strip it so it doesn't repeat
                 if (cleanBody.startsWith(cleanHeader)) {
                     cleanBody = cleanBody.substring(cleanHeader.length).trim();
                 }
@@ -216,7 +227,6 @@
                 document.getElementById("clause-offsets").innerText = `Offsets: ${data.top_clause.start_char}-${data.top_clause.end_char}`;
                 document.getElementById("clause-score").innerText = `Score: ${data.top_clause.score.toFixed(4)}`;
 
-                // 2. Update Metrics
                 document.getElementById("metric-safe").innerText = data.verified_safe_claims.length;
                 document.getElementById("metric-flagged").innerText = data.flagged_claims.length;
                 
@@ -225,7 +235,6 @@
                     : "0.0";
                 document.getElementById("metric-latency").innerText = avgLatency;
 
-                // 3. Render Claim Cards
                 const container = document.getElementById("claims-container");
                 container.innerHTML = "";
 
@@ -260,9 +269,7 @@
                     container.appendChild(card);
                 });
 
-                // 4. Update Telemetry JSON
                 document.getElementById("raw-json").innerText = JSON.stringify(data, null, 2);
-
             } catch (err) {
                 alert("Audit query failed: " + err.message);
             } finally {
