@@ -35,7 +35,7 @@ flowchart TD
 * **Deterministic Verification Gate (`core/auditor.py`):** Implements a post-generation cross-encoder Natural Language Inference (`nli-deberta-v3-large`) auditing layer. Features an explicit guardrail bypass mechanism for out-of-scope LLM responses. Every generated claim is verified against the source premise span:
 
 $$
-\text{Decision}(P, H) = \begin{cases} \text{VERIFIED SAFE}, & \text{if } P(\text{Entailment}) \ge 0.70 \text{ or Exact Substring} \\ \text{CONTRADICTION FLAG}, & \text{if } P(\text{Contradiction}) > 0.40 \\ \text{UNGROUNDED NEUTRAL}, & \text{otherwise} \end{cases}
+\text{Decision}(P, H) = \begin{cases} \text{VERIFIED SAFE}, & \text{if } P(\text{Entailment}) \ge 0.70 \text{ or Exact Substring} \\\\ \text{CONTRADICTION FLAG}, & \text{if } P(\text{Contradiction}) > 0.40 \\\\ \text{UNGROUNDED NEUTRAL}, & \text{otherwise} \end{cases}
 $$
 
 ---
