@@ -8,7 +8,7 @@
 
 ```mermaid
 flowchart TD
-    Raw[Raw Contract PDF / Text] --> AST[Structure-Aware AST Clause Parser<br/>Preserves Headers & Char Offsets]
+    Raw[Raw Contract PDF / Text] --> AST[Structure-Aware Clause Parser<br/>Preserves Headers & Char Offsets]
     AST --> Index[Offline Index Serialization to Disk<br/>- FAISS InnerProduct Index<br/>- Normalized BGE-small Embeddings<br/>- JSON Metadata Manifest]
     
     Index -- "Cold-Start: < 1 ms" --> Engine[FastAPI Asynchronous Engine<br/>- In-Memory Memory Mapped Index<br/>- Asymmetric Dense Search top-k]
@@ -30,8 +30,8 @@ flowchart TD
 
 ## 2. Core Technical Contributions
 
-* **Offline Ingestion & Chunking (`core/parser.py`):** Accepts raw PDFs or TXT documents. Replaces fixed-token slicing with hierarchical clause-boundary parsing. Preserves parent-child section relationships and character offsets. Dynamically reconstructs the FAISS index on the fly.
-* **Local Generative Synthesis (`core/generator.py`):** Completely independent from paid APIs. Uses `Qwen2.5-0.5B-Instruct` (~490M params) running entirely on local CPU. Strict system prompts force the LLM to answer affirmatively to prevent NLI false-positives on negation.
+* **Offline Ingestion & Chunking (`core/parser.py`):** Accepts raw PDFs or TXT documents. Replaces fixed-token slicing with clause-boundary parsing. Preserves character offsets. Dynamically reconstructs the FAISS index on the fly.
+* **Local Generative Synthesis (`core/generator.py`):** Completely independent from paid APIs. Uses `Qwen2.5-0.5B-Instruct` (~490M params) running locally (GPU or CPU). Strict system prompts force the LLM to answer affirmatively to prevent NLI false-positives on negation.
 * **Deterministic Verification Gate (`core/auditor.py`):** Implements a post-generation cross-encoder Natural Language Inference (`nli-deberta-v3-large`) auditing layer. Features an explicit guardrail bypass mechanism for out-of-scope LLM responses. Every generated claim is verified against the source premise span:
 
 $$
@@ -85,7 +85,7 @@ legal-safety-engine/
 git clone https://github.com/yellowgram1543/legal-safety-engine.git
 cd legal-safety-engine
 pip install -r requirements.txt
-pip install pypdf python-multipart
+pip install pypdf python-multipart httpx
 ```
 
 ### Start API Service & UI Dashboard
